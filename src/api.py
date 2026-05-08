@@ -3,11 +3,10 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-import pandas as pd
 from datetime import datetime
-from .database import get_session
-from .models import Item, Sell
-from .shemas import ItemSchema, SellSchema, SellOutSchema, ItemOutSchema
+from .database import get_session,engine, Base
+from .models import Category, Item, Sell
+from .shemas import CategorySchema, ItemSchema, SellSchema, SellOutSchema, ItemOutSchema
 
 router = APIRouter()
 
@@ -98,11 +97,12 @@ async def create_sell(
         raise HTTPException(400, "Not enough quantity in stock")
     item.quantity -= sell.quantity_sold
     total_price = item.price * sell.quantity_sold
+    sale_date = sell.created_at if sell.created_at else datetime.now()
     new_sell = Sell(
         item_id=sell.item_id,
         quantity_sold=sell.quantity_sold,
         total_price=total_price,
-        created_at=str(datetime.now())
+        created_at=str(sale_date)
     )
     db.add(new_sell)
     await db.commit()
@@ -131,6 +131,19 @@ async def read_sells(
         )
         for sell in sells
     ]
+
+@router.post("/categories/")
+async def create_category(
+    category: CategorySchema,
+    db: AsyncSession = Depends(get_session),
+    ):
+    new_category = Category(
+        name=category.name
+    )
+    db.add(new_category)
+    await db.commit()
+    await db.refresh(new_category)
+    return new_category
 
 @router.get("/analytics/revenue/")
 async def get_revenue(
@@ -166,3 +179,10 @@ async def get_revenue(
         )
         for sell in sells
     ], total_revenue
+
+
+@router.post("/setup_database")
+async def setup_database():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    return {"message": "Database setup completed"}

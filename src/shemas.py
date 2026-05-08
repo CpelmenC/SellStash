@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 class ItemSchema(BaseModel):
@@ -25,6 +27,7 @@ class CategorySchema(BaseModel):
 class SellSchema(BaseModel):
     item_id:int
     quantity_sold:int
+    created_at: datetime | None = None
 
 class SellOutSchema(BaseModel):
     id:int
