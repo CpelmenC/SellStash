@@ -1,10 +1,11 @@
 from datetime import datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+import pandas as pd
+from datetime import datetime
 from .database import get_session
-from fastapi import Depends, HTTPException
 from .models import Item, Sell
 from .shemas import ItemSchema, SellSchema, SellOutSchema, ItemOutSchema
 
@@ -110,5 +111,58 @@ async def create_sell(
         id=new_sell.id,
         item_id=new_sell.item_id,
         quantity_sold=new_sell.quantity_sold,
-        total_price=new_sell.total_price
+        total_price=new_sell.total_price,
+        created_at=new_sell.created_at
     )
+
+@router.get("/sells/")
+async def read_sells(
+    db: AsyncSession = Depends(get_session),
+    ) -> list[SellOutSchema]:
+    result = await db.execute(select(Sell))
+    sells = result.scalars().all()
+    return [
+        SellOutSchema(
+            id=sell.id,
+            item_id=sell.item_id,
+            quantity_sold=sell.quantity_sold,
+            total_price=sell.total_price,
+            created_at=sell.created_at
+        )
+        for sell in sells
+    ]
+
+@router.get("/analytics/revenue/")
+async def get_revenue(
+    from_date: datetime | None = None,
+    to_date: datetime | None = None,
+    db: AsyncSession = Depends(get_session),
+    ) -> tuple[list[SellOutSchema], float]:
+    
+    query = select(Sell)
+    if from_date is not None:
+        query = query.where(Sell.created_at >= str(from_date))
+    
+    if to_date is not None:
+        query = query.where(Sell.created_at <= str(to_date))
+    
+    if from_date is not None and to_date is not None and from_date > to_date:
+        raise HTTPException(400, "from_date cannot be greater than to_date")
+    
+    if from_date is not None and to_date is not None:
+        query = query.where(Sell.created_at.between(str(from_date), str(to_date)))
+        
+    result = await db.execute(query)
+    sells = result.scalars().all()
+    total_revenue = sum(sell.total_price for sell in sells)
+    
+    return [
+        SellOutSchema(
+            id=sell.id,
+            item_id=sell.item_id,
+            quantity_sold=sell.quantity_sold,
+            total_price=sell.total_price,
+            created_at=sell.created_at
+        )
+        for sell in sells
+    ], total_revenue

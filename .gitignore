@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+.env
+.vscode/
+*.log
+
+# node
+node_modules/
+
+# windows
+Thumbs.db
+*.pem
